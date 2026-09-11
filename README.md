@@ -241,4 +241,4 @@ Distributed under the MIT License. See `LICENSE` for more information.
 ---
 
 ## 👤 Author
-- **Yash Chhabda** - [GitHub Profile](https://github.com/yxshh98)
+- **Yash Chhabda** - [GitHub Profile](https://github.com/yashchhabda)
