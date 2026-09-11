@@ -6,9 +6,9 @@
 [![Spotify API](https://img.shields.io/badge/Spotify-API-1DB954?style=for-the-badge&logo=spotify&logoColor=white)](https://developer.spotify.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-An intelligent, multi-interface **Automatic Song & Music Recognition System** written in Python. The system captures 10 seconds of live audio or accepts pre-recorded audio files and recognizes songs using a **hybrid dual-engine architecture**:
+An intelligent, multi-interface **Automatic Song & Music Recognition System** built in Python. The system captures 10 seconds of live microphone audio or accepts audio file uploads (`.wav`, `.mp3`) and identifies songs using a **hybrid dual-engine architecture**:
 
-1. **Cloud Acoustic Recognition**: Powered by the **ACRCloud** audio fingerprinting database and enriched with real-time metadata, high-resolution album artwork, preview audio, and track URLs from the **Spotify Web API**.
+1. **Cloud Acoustic Recognition**: Powered by the **ACRCloud** audio fingerprinting engine and enriched with real-time metadata, high-resolution album artwork, 30-second audio previews, and track URLs from the **Spotify Web API**.
 2. **Custom In-House DSP Acoustic Fingerprinting Engine**: A digital signal processing (DSP) engine implementing the landmark Avery Wang (Shazam) algorithm — featuring Short-Time Fourier Transform (STFT) spectrogram computation, 2D local maximum filtering (Constellation Map extraction), combinatorial peak hashing, and relative time-delta histogram alignment.
 
 The system is accessible via three interfaces:
@@ -22,32 +22,32 @@ The system is accessible via three interfaces:
 
 ```mermaid
 flowchart TD
-    subgraph Audio Input
-        Mic[Microphone Input / 10s Capture] --> Ingest[Audio Preprocessing & Mono Downmixing]
-        Upload[WAV / MP3 File Upload] --> Ingest
+    subgraph Sub_Input ["Audio Input"]
+        Mic["Microphone Input (10s Capture)"] --> Ingest["Audio Preprocessing & Mono Downmixing"]
+        Upload["Audio File Upload (WAV / MP3)"] --> Ingest
     end
 
-    subgraph Cloud Recognition Engine
-        Ingest --> ACR[ACRCloud Fingerprinting API]
-        ACR --> ACRMeta[Parse Title, Artist, Album & Spotify Track ID]
-        ACRMeta --> Spotify[Spotify Web API Client]
-        Spotify --> RichMeta[Album Art, 30s Audio Preview, Direct Links]
+    subgraph Sub_Cloud ["Cloud Recognition Engine"]
+        Ingest --> ACR["ACRCloud Fingerprinting API"]
+        ACR --> ACRMeta["Extract Title, Artist, Album & Spotify ID"]
+        ACRMeta --> Spotify["Spotify Web API Client"]
+        Spotify --> RichMeta["Album Art, 30s Audio Preview & Track Link"]
     end
 
-    subgraph Custom DSP Fingerprinting Engine
-        Ingest --> STFT[Short-Time Fourier Transform / STFT]
-        STFT --> Spec[Log-Power 2D Spectrogram]
-        Spec --> Peaks[2D Local Max Filtering / Constellation Map]
-        Peaks --> Hashing[Combinatorial Target-Zone Hashing]
-        Hashing --> Delta[Time-Delta Histogram Peak Matcher]
-        Delta --> LocalDB[(Local Fingerprint Index)]
+    subgraph Sub_DSP ["Custom DSP Fingerprinting Engine"]
+        Ingest --> STFT["Short-Time Fourier Transform (STFT)"]
+        STFT --> Spec["Log-Power 2D Spectrogram"]
+        Spec --> Peaks["2D Local Maximum Filter (Constellation Map)"]
+        Peaks --> Hashing["Combinatorial Target-Zone Hashing"]
+        Hashing --> Delta["Time-Delta Histogram Peak Matcher"]
+        Delta --> LocalDB[("Local Fingerprint Database")]
     end
 
-    RichMeta --> TkinterApp[Tkinter Desktop App (song.py)]
+    RichMeta --> TkinterApp["Tkinter Desktop GUI (song.py)"]
     Delta --> TkinterApp
-    RichMeta --> FlaskApp[Flask Web Dashboard (flask_app.py)]
+    RichMeta --> FlaskApp["Flask Web Dashboard (flask_app.py)"]
     Delta --> FlaskApp
-    RichMeta --> DjangoAPI[Django REST API (django_app/)]
+    RichMeta --> DjangoAPI["Django REST API (django_app/)"]
     Delta --> DjangoAPI
 ```
 
@@ -55,44 +55,59 @@ flowchart TD
 
 ## 🔬 Mathematical Deep Dive: How Audio Fingerprinting Works
 
-Commercial music identification (like Shazam) does not compare raw waveforms because audio recordings captured from microphones suffer from room acoustics, background noise, low-quality microphones, and volume variation. Instead, our custom fingerprinting engine uses **Spectrogram Constellation Hashing**:
+Commercial music identification (like Shazam) cannot rely on comparing raw waveforms because audio captured from microphones suffers from room reverberation, ambient noise, frequency distortion, and volume variation. Instead, our custom fingerprinting engine uses **Spectrogram Constellation Hashing**:
 
 ### 1. Short-Time Fourier Transform (STFT)
 The audio time-series signal $x[n]$ sampled at $f_s = 44,100\text{ Hz}$ is partitioned into overlapping windows (window size $N = 4096$, hop size $H = 512$) multiplied by a Hann window function $w[n]$:
 
-$$X(m, \omega) = \sum_{n=0}^{N-1} x[n + mH] \cdot w[n] \cdot e^{-j \omega n}$$
+```math
+X(m, \omega) = \sum_{n=0}^{N-1} x[n + mH] \cdot w[n] \cdot e^{-j \omega n}
+```
 
-We convert the magnitude spectrum into logarithmic decibels ($\text{dB}$):
-$$S_{\text{dB}}(m, k) = 20 \log_{10}\left(\max(|X(m, k)|, 10^{-6})\right)$$
+We convert the magnitude spectrum into logarithmic decibels ($\text{dB}$) to emulate human perceptual loudness:
+
+```math
+S_{\text{dB}}(m, k) = 20 \log_{10}\left(\max(|X(m, k)|, 10^{-6})\right)
+```
 
 ### 2. Peak Picking & Constellation Map
-A local 2D maximum filter ($\text{neighborhood} = 25 \times 25$) is swept across the spectrogram matrix to identify points that are strictly higher in amplitude than all surrounding neighbors and above a dynamic 75th-percentile energy threshold:
+A local 2D maximum filter ($\text{neighborhood} = 25 \times 25$) sweeps across the spectrogram matrix to identify points that are strictly higher in amplitude than all surrounding neighbors and above a dynamic 75th-percentile energy threshold:
 
-$$\text{is\_peak}(t, f) = \left(S_{\text{dB}}(t, f) == \max_{(i, j) \in \mathcal{N}} S_{\text{dB}}(t+i, f+j)\right) \land \left(S_{\text{dB}}(t, f) > \tau\right)$$
+```math
+\text{is\_peak}(t, f) = \left(S_{\text{dB}}(t, f) = \max_{(i, j) \in \mathcal{N}} S_{\text{dB}}(t+i, f+j)\right) \land \left(S_{\text{dB}}(t, f) > \tau\right)
+```
 
-This condenses thousands of audio samples into a sparse set of dominant frequency coordinates: the **Constellation Map** $\{(t_i, f_i)\}$.
+This condenses millions of audio sample points into a sparse, highly robust set of dominant frequency landmarks: the **Constellation Map** $\{(t_i, f_i)\}$.
 
 ### 3. Combinatorial Target-Zone Hashing
-Raw individual peaks are susceptible to false alarms. To make fingerprints unique, each **anchor peak** $(t_1, f_1)$ is paired with multiple subsequent peaks $(t_2, f_2)$ situated in a forward lookahead "target zone":
+Raw individual peaks are not unique enough on their own. To make fingerprints resilient against noise, each **anchor peak** $(t_1, f_1)$ is paired with multiple subsequent peaks $(t_2, f_2)$ situated in a forward lookahead "target zone":
 - Time delta constraint: $t_{\min} \le t_2 - t_1 \le t_{\max}$
 - Frequency delta constraint: $|f_2 - f_1| \le \Delta f_{\max}$
 
-A cryptographic hash is generated from the tuple $(f_1, f_2, \Delta t)$:
-$$\text{Hash} = \text{SHA1}(f_1 \parallel f_2 \parallel (t_2 - t_1))_{[0:12]}$$
-Each fingerprint stored in the database consists of `(Hash, t1_offset)`.
+A cryptographic 32-bit acoustic hash is generated from the tuple $(f_1, f_2, \Delta t)$:
+
+```math
+\text{Hash} = \text{SHA1}(f_1 \parallel f_2 \parallel (t_2 - t_1))_{[0:12]}
+```
+
+Each fingerprint stored in the database is the pair: `(Hash, t1_offset)`.
 
 ### 4. Temporal Coherence Matching (Time-Delta Histogram Peak)
 When matching a 10-second query against the database:
-1. For every hash match between query and database, calculate the time difference:
-   $$\Delta t = t_{\text{database}} - t_{\text{query}}$$
+1. For every hash collision between query and database, calculate the relative time difference:
+
+```math
+\Delta t = t_{\text{database}} - t_{\text{query}}
+```
+
 2. If the audio is indeed the same song, true hash collisions will all share the exact same time offset $\Delta t$, regardless of background noise. Random noise collisions will be scattered randomly across time.
-3. Plotting a histogram of $\Delta t$ reveals a sharp peak for the true song. The height and coherence of this peak determine the match confidence!
+3. Plotting a histogram of $\Delta t$ reveals a sharp peak for the true song. The height and coherence of this peak determine the match confidence score!
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
-- 🎧 **10-Second Mic Capture**: One-click microphone recording with automatic input device validation.
+- 🎧 **10-Second Mic Capture**: One-click microphone recording with automatic input device validation and status reporting.
 - 🌐 **Cloud Recognition**: Instant identification via ACRCloud API covering tens of millions of commercial tracks.
 - 🎨 **Spotify Web API Enrichment**: Fetches high-resolution album artwork, artist details, album name, Spotify web URL, and 30-second audio previews.
 - 🔬 **Custom DSP Fingerprinting**: Offline-capable constellation spectrogram matcher with local JSON indexing.
@@ -123,6 +138,7 @@ Song-Recognition-System/
 ├── requirements.txt        # Python package dependencies
 ├── .env.example            # Environment variables template
 ├── .gitignore              # Git ignore rules
+├── LICENSE                 # MIT License
 └── README.md               # Project documentation
 ```
 
@@ -131,8 +147,8 @@ Song-Recognition-System/
 ## 🚀 Getting Started
 
 ### 1. Prerequisites
-- Python 3.8 to 3.11
-- PortAudio (for microphone access):
+- **Python 3.8 to 3.11**
+- **PortAudio** (required for microphone audio recording):
   - **macOS**: `brew install portaudio`
   - **Ubuntu/Debian**: `sudo apt-get install portaudio19-dev libasound2-dev`
   - **Windows**: Included with `sounddevice` wheels automatically
@@ -143,7 +159,7 @@ Clone the repository and install the dependencies:
 ```bash
 git clone https://github.com/yxshh98/Song-Recognition-System.git
 cd Song-Recognition-System
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 ### 3. API Credentials Setup (Optional)
@@ -171,7 +187,7 @@ SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 Launch the graphical desktop interface:
 
 ```bash
-python song.py
+python3 song.py
 ```
 - Click **"🎧 Identify Song from Mic (10s)"** to record and identify music playing around you.
 - Click **"📊 View Spectrogram"** to inspect the STFT power spectrogram and constellation peaks.
@@ -183,7 +199,7 @@ python song.py
 Start the local web server:
 
 ```bash
-python flask_app.py
+python3 flask_app.py
 ```
 Open [http://127.0.0.1:5001](http://127.0.0.1:5001) in your browser. You can record audio directly through your web browser or upload `.wav` / `.mp3` files for recognition.
 
@@ -193,7 +209,7 @@ Open [http://127.0.0.1:5001](http://127.0.0.1:5001) in your browser. You can rec
 Start the Django development server:
 
 ```bash
-python manage.py runserver 8000
+python3 manage.py runserver 8000
 ```
 API endpoints:
 - `POST /api/recognize/`: Upload an audio file to receive DSP acoustic fingerprints and matching candidates.
