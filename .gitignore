@@ -1,0 +1,37 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Audio files & temporary recordings
+*.wav
+*.mp3
+*.flac
+*.ogg
+my_recording.wav
+temp_spectrogram.png
+spectrogram_constellation.png
+
+# Database & local data
+db.sqlite3
+fingerprints_db.json
+
+# Environment variables & secrets
+.env
+.env.local
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# IDE configuration
+.idea/
+.vscode/
+*.swp
+*.swo

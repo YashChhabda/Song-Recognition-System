@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acoustic Song Recognition System | Cloud & DSP Fingerprinting</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 50% 0%, #171b26 0%, #0a0c10 100%);
+      --card-bg: rgba(22, 27, 34, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-primary: #1DB954;
+      --accent-secondary: #00d2ff;
+      --accent-glow: rgba(0, 210, 255, 0.25);
+      --text-main: #f0f6fc;
+      --text-muted: #8b949e;
+      --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono-family: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      background-attachment: fixed;
+      color: var(--text-main);
+      font-family: var(--font-family);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 20px;
+    }
+
+    header {
+      text-align: center;
+      max-width: 760px;
+      margin-bottom: 35px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      background: rgba(0, 210, 255, 0.1);
+      border: 1px solid rgba(0, 210, 255, 0.3);
+      color: var(--accent-secondary);
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 50%, var(--accent-secondary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+      letter-spacing: -0.5px;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .glass-card:hover {
+      border-color: rgba(255, 255, 255, 0.14);
+    }
+
+    .action-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .btn {
+      font-family: var(--font-family);
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 14px 28px;
+      border-radius: 12px;
+      cursor: pointer;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.25s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #1DB954 0%, #14833b 100%);
+      color: #fff;
+      box-shadow: 0 4px 18px rgba(29, 185, 84, 0.35);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 24px rgba(29, 185, 84, 0.5);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.14);
+      transform: translateY(-2px);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .recorder-status {
+      margin-top: 15px;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      font-family: var(--mono-family);
+    }
+
+    .pulsing-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      background: #ff4757;
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 12px #ff4757; }
+      100% { transform: scale(0.9); opacity: 0.6; }
+    }
+
+    .result-section {
+      display: none;
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .song-details-grid {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 640px) {
+      .song-details-grid {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+      }
+    }
+
+    .album-art-wrap {
+      width: 180px;
+      height: 180px;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #111;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .album-art-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .song-meta h2 {
+      font-size: 1.7rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+
+    .song-meta .artist {
+      font-size: 1.15rem;
+      color: var(--accent-secondary);
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .song-meta .album {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .meta-links {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .link-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 20px;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .link-spotify {
+      background: rgba(29, 185, 84, 0.15);
+      color: #1DB954;
+      border: 1px solid rgba(29, 185, 84, 0.3);
+    }
+    .link-spotify:hover {
+      background: rgba(29, 185, 84, 0.25);
+    }
+
+    .link-preview {
+      background: rgba(0, 210, 255, 0.15);
+      color: var(--accent-secondary);
+      border: 1px solid rgba(0, 210, 255, 0.3);
+    }
+    .link-preview:hover {
+      background: rgba(0, 210, 255, 0.25);
+    }
+
+    .dsp-box {
+      margin-top: 20px;
+      padding: 16px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .dsp-box h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent-secondary);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dsp-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      font-family: var(--mono-family);
+      font-size: 0.85rem;
+    }
+
+    .metric-card {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .metric-label {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .metric-val {
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .spectrogram-view {
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    .spectrogram-view img {
+      width: 100%;
+      max-height: 380px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      object-fit: contain;
+      background: #121212;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="badge">Acoustic Signal Processing & Cloud Recognition</div>
+    <h1>Song Recognition System</h1>
+    <p class="subtitle">
+      Hybrid automatic music identification combining high-speed ACRCloud + Spotify metadata enrichment
+      with an in-house DSP acoustic fingerprinting engine (STFT Spectrogram & Constellation Hashing).
+    </p>
+  </header>
+
+  <main class="container">
+    <!-- Capture & Control Panel -->
+    <div class="glass-card action-panel">
+      <button id="btnRecord" class="btn btn-primary" onclick="startMicRecording()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+        <span>Record from Browser (10s)</span>
+      </button>
+
+      <label class="btn btn-secondary" style="cursor: pointer;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <span>Upload Audio File (WAV/MP3)</span>
+        <input type="file" id="audioFileInput" accept="audio/*" style="display:none" onchange="handleFileUpload(event)">
+      </label>
+
+      <div id="statusText" class="recorder-status">Ready to capture audio.</div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="resultSection" class="glass-card result-section">
+      <div class="song-details-grid">
+        <div class="album-art-wrap">
+          <img id="albumArtImg" src="" alt="Album Artwork">
+        </div>
+        <div class="song-meta">
+          <h2 id="songTitle">Song Title</h2>
+          <div id="songArtist" class="artist">Artist Name</div>
+          <div id="songAlbum" class="album">Album Title</div>
+
+          <div class="meta-links">
+            <a id="spotifyLink" href="#" target="_blank" class="link-pill link-spotify">
+              <span>Listen on Spotify ↗</span>
+            </a>
+            <a id="previewLink" href="#" target="_blank" class="link-pill link-preview" style="display:none;">
+              <span>Play 30s Audio Preview ▷</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- DSP Metrics Analysis -->
+      <div class="dsp-box">
+        <h3>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          Acoustic DSP Fingerprinting Metrics
+        </h3>
+        <div class="dsp-metrics-grid">
+          <div class="metric-card">
+            <div class="metric-label">Extracted Spectral Peaks</div>
+            <div id="metricPeaks" class="metric-val">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Combinatorial Hashes</div>
+            <div id="metricHashes" class="metric-val">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Audio Duration</div>
+            <div id="metricDuration" class="metric-val">10.0s</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Local Catalog Match</div>
+            <div id="metricLocalMatch" class="metric-val">N/A</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Spectrogram Plot -->
+      <div id="spectrogramContainer" class="spectrogram-view" style="display:none;">
+        <h3 style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 10px; text-align: left;">
+          Spectrogram & Peak Constellation Overlay
+        </h3>
+        <img id="spectrogramImg" src="" alt="Audio Spectrogram">
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let mediaRecorder;
+    let audioChunks = [];
+    const btnRecord = document.getElementById('btnRecord');
+    const statusText = document.getElementById('statusText');
+    const resultSection = document.getElementById('resultSection');
+
+    async function startMicRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = event => {
+          if (event.data.size > 0) audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+          stream.getTracks().forEach(track => track.stop());
+          await submitAudioBlob(audioBlob, "mic_capture.wav");
+        };
+
+        mediaRecorder.start();
+        btnRecord.disabled = true;
+        let countdown = 10;
+        statusText.innerHTML = `<span class="pulsing-dot"></span>Recording microphone input (${countdown}s remaining)...`;
+
+        const interval = setInterval(() => {
+          countdown--;
+          if (countdown > 0) {
+            statusText.innerHTML = `<span class="pulsing-dot"></span>Recording microphone input (${countdown}s remaining)...`;
+          } else {
+            clearInterval(interval);
+            mediaRecorder.stop();
+            statusText.innerText = "Analyzing audio signal (STFT Spectrogram + ACRCloud)...";
+          }
+        }, 1000);
+
+      } catch (err) {
+        alert("Microphone access was denied or not supported: " + err.message);
+        btnRecord.disabled = false;
+        statusText.innerText = "Microphone capture failed.";
+      }
+    }
+
+    async function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      statusText.innerText = `Analyzing uploaded file "${file.name}"...`;
+      await submitAudioBlob(file, file.name);
+    }
+
+    async function submitAudioBlob(blob, filename) {
+      const formData = new FormData();
+      formData.append('audio', blob, filename);
+
+      try {
+        const res = await fetch('/api/recognize', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        btnRecord.disabled = false;
+
+        if (data.error) {
+          statusText.innerText = "Recognition error: " + data.error;
+          return;
+        }
+
+        statusText.innerText = "Recognition Complete.";
+        renderResults(data);
+
+      } catch (e) {
+        btnRecord.disabled = false;
+        statusText.innerText = "Request failed: " + e.message;
+      }
+    }
+
+    function renderResults(data) {
+      resultSection.style.display = 'block';
+
+      const cloud = data.cloud_recognition || {};
+      const spotify = data.spotify || {};
+      const dsp = data.dsp_metrics || {};
+
+      document.getElementById('songTitle').innerText = cloud.title || "Unknown Song";
+      document.getElementById('songArtist').innerText = cloud.artist ? "by " + cloud.artist : "Artist Unknown";
+      document.getElementById('songAlbum').innerText = cloud.album ? "Album: " + cloud.album : "";
+
+      const albumArt = document.getElementById('albumArtImg');
+      if (spotify.album_art_url) {
+        albumArt.src = spotify.album_art_url;
+      } else {
+        albumArt.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180' fill='%23333'><rect width='100%' height='100%'/><text x='50%' y='50%' fill='%23777' dominant-baseline='middle' text-anchor='middle' font-size='14'>No Artwork</text></svg>";
+      }
+
+      const spotifyLink = document.getElementById('spotifyLink');
+      if (spotify.spotify_url) {
+        spotifyLink.href = spotify.spotify_url;
+        spotifyLink.style.display = 'inline-flex';
+      } else {
+        spotifyLink.style.display = 'none';
+      }
+
+      const previewLink = document.getElementById('previewLink');
+      if (spotify.preview_url) {
+        previewLink.href = spotify.preview_url;
+        previewLink.style.display = 'inline-flex';
+      } else {
+        previewLink.style.display = 'none';
+      }
+
+      // DSP metrics
+      document.getElementById('metricPeaks').innerText = (dsp.peaks_extracted || 0).toLocaleString();
+      document.getElementById('metricHashes').innerText = (dsp.hashes_generated || 0).toLocaleString();
+      document.getElementById('metricDuration').innerText = (dsp.duration_sec || 10) + 's';
+
+      const localMatch = dsp.local_match || {};
+      if (localMatch.matched) {
+        document.getElementById('metricLocalMatch').innerText = localMatch.best_match.song;
+      } else {
+        document.getElementById('metricLocalMatch').innerText = "No Local Match";
+      }
+
+      // Spectrogram plot
+      if (data.has_spectrogram) {
+        const specImg = document.getElementById('spectrogramImg');
+        specImg.src = '/api/spectrogram?t=' + new Date().getTime();
+        document.getElementById('spectrogramContainer').style.display = 'block';
+      }
+    }
+  </script>
+</body>
+</html>
